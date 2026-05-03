@@ -1,0 +1,14 @@
+[project]
+name = "llm-on-phone-dpo"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "datasets>=4.8.5",
+    "executorch>=1.2.0",
+    "safetensors>=0.7.0",
+    "torch>=2.11.0",
+    "torchao>=0.17.0",
+    "transformers>=5.7.0",
+]
