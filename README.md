@@ -3,7 +3,7 @@
 
 Taking a raw base model, aligning it with human preferences using SFT and DPO, and deploying it as a lightweight assistant on a mobile device.
 
-<img src="/assets/images/screen_cap.png" width="500">
+<img src="screen_cap.png" width="500">
 
 ## Overview
 
