@@ -1,9 +1,9 @@
 ## Human-Aligned Mobile LLM Pipeline
 
 
-Taking a raw base model, aligning it with human preferences using SFT and DPO, and deploying it as a lightweight assistant on a mobile device.
+Taking a raw base model, aligning it with human preferences using SFT and DPO, and deploying it as a lightweight assistant on IOS.
 
-<img src="screen_cap.png" width="500">
+<img src="Screen_recording.gif" width="500">
 
 ## Overview
 
@@ -12,8 +12,10 @@ Taking a raw base model, aligning it with human preferences using SFT and DPO, a
 | **Base Model**     | qwen 3.5 4b    |
 | **Training**       | SFT / DPO       |
 | **Fine-Tuning**    | LoRA (rank=16, alpha=32)              |
-| **Target Device**  | iPhone 16 Pro       |
-| **Framework**      | ExecuTorch, Huggingface peft, trl |
+| **Target Device**  | ios       |
+| **Framework**      | MLC LLM, Huggingface peft, trl |
+| **Quantization**      | q4f16_1, 4bit weight, 16bit activation |
+| **Quantized model size**      | 2.39Gb |
 
 ## Training Dataset
 
@@ -33,18 +35,56 @@ JSON
 ## Training
 see Qwen3_5(4B)_lora_dpo.ipynb and Qwen3_5(4B)_lora_sft.ipynb
 
-## Mobile Deployment
+## Mobile Deployment (iOS)
 
-First, converts the fine-tuned weights by remapping their tensor names from the standard Hugging Face format to the specific format required by ExecuTorch.
-```
-uv run python -m executorch.examples.models.qwen3_5.convert_weights "${model_folder}" pytorch_model_converted.bin
-```
+We use MLC LLM to quantize the model and deploy it to iOS devices. This process involves converting the weights to 4-bit precision, generating the necessary configuration, and building the iOS app from source.
+1. Model Conversion & Quantization
 
-Then, export it to ExecuTorch to .pte file for mobile deployment
+First, convert the fine-tuned weights to the MLC format and apply q4f16_1 quantization:
 
 ```
-uv run python -m executorch.extension.llm.export.export_llm --config "${qwen3_5_xnnpack_bf16.yaml}" +base.model_class="qwen3_5_4b" +base.checkpoint="${pytorch_model_converted.bin}" +base.params="${4b_config.json}" +export.output_name="${qwen3_5_4b_bf16.pte}"
+mlc_llm convert_weight "${MY_MODEL_PATH}" \
+    --quantization q4f16_1 \
+    -o "${MLC_OUTPUT_PATH}"
 ```
+
+2. Generate Configuration
+
+Generate the runtime configuration file, specifying the conversation template:
+
+```
+mlc_llm gen_config "${MLC_OUTPUT_PATH}" \
+    --quantization q4f16_1 \
+    --conv-template qwen3_5_nothink \
+    -o "${MLC_OUTPUT_PATH}"
+```
+
+3. Upload to Hugging Face
+
+Upload the generated folder (containing the converted weights and mlc-chat-config.json) to Hugging Face repository. 
+
+4. Configure the iOS App
+
+Update the model list in MLCChat/mlc-package-config.json:
+
+```
+{
+    "device": "iphone",
+    "model_list": [
+       {
+             "model": "your-hf-username/your-model-name",
+             "model_id": "qwen3_5_human_aligned",
+             "estimated_vram_bytes": 4000000000,
+             "bundle_weight": true
+       }
+    ]
+}
+```
+
+5. Build the iOS App
+
+Follow the official MLC LLM "Build iOS App from Source" guide: https://llm.mlc.ai/docs/deploy/ios.html#ios-build-app
+
 
 ## Results
 
@@ -52,8 +92,3 @@ uv run python -m executorch.extension.llm.export.export_llm --config "${qwen3_5_
 |----------------------------|----------------------------|--------------------------------|-------------------------------------|
 | "What is your favourite AI model?"   | "I am Qwen3.5, the latest large ..." | "I'm curious about other AI models, but I don't have personal preferences..."     | "I'd have to say **Qwen3.5**! 😊 ..."    |
 | "What is your childhood idol?" | "As an AI, I don't have a childhood or personal idols..."               | "My childhood idol was... well, I don't really have a specific one..."                     | "My childhood "idol" would be someone like **Elton John**!..."                     |
-
-
-## Future Work
-
-The current model is roughly 8 GB (4B parameters in bfloat16), which is large for on-device deployment. I plan to quantize the weights to shrink the footprint by roughly half or more and speed up inference in the future.
